@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://cetj2xwi4tt6l"]
+
+[ext_resource type="PackedScene" uid="uid://c4a8o1xd5utve" path="res://Character.tscn" id="1_m6qln"]
+[ext_resource type="PackedScene" uid="uid://bqpcn2euiwi4j" path="res://Ground.tscn" id="2_asdu3"]
+
+[node name="Main Scene" type="Node3D" unique_id=1726388202]
+
+[node name="Character" parent="." unique_id=264607458 instance=ExtResource("1_m6qln")]
+
+[node name="Node3D" type="Node3D" parent="Character" unique_id=10234339]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Camera3D" type="Camera3D" parent="Character/Node3D" unique_id=186229151]
+
+[node name="Ground" parent="." unique_id=681360999 instance=ExtResource("2_asdu3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)

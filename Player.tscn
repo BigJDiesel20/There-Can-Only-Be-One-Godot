@@ -1,0 +1,31 @@
+[gd_scene load_steps=6 format=3 uid="uid://cqg74jyjy8nnk"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_1"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_Body"]
+albedo_color = Color(0.95, 0.45, 0.1, 1)
+roughness = 0.6
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_Face"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_Face"]
+albedo_color = Color(0.08, 0.08, 0.1, 1)
+roughness = 0.5
+
+[node name="Character" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 3
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_1")
+material_override = SubResource("Mat_Body")
+
+[node name="Face" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.5, 0, 0, 0, 0, 0.24, 0, -0.1, 0, 0, 0.51, 0.602)
+mesh = SubResource("CylinderMesh_Face")
+material_override = SubResource("Mat_Face")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_1")

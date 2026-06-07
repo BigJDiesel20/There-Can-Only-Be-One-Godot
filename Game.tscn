@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://b3game00001x"]
+
+[ext_resource type="Script" path="res://Scripts/GameStates/GameManager.cs" id="1_gm"]
+[ext_resource type="PackedScene" path="res://Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://Ground.tscn" id="3_ground"]
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 1
+background_color = Color(0.27, 0.35, 0.45, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.7
+
+[node name="Game" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 8, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Ground" parent="." instance=ExtResource("3_ground")]
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("1_gm")
+PlayerScene = ExtResource("2_player")
