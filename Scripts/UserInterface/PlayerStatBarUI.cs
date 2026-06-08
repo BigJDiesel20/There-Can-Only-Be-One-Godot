@@ -18,10 +18,10 @@ public class PlayerStatBarUI
     ColorRect _healthFill, _staminaFill, _tHealthFill, _tStaminaFill;
     AuraPie   _auraPie, _tAuraPie;
     Control   _targetRoot;
+    CanvasLayer _layer;
     TextureRect _auraSymbol, _tAuraSymbol;
-    RoleBadge   _selfRole;
-    Control     _rosterRow;
-    readonly List<RoleBadge> _rosterBadges = new();
+    HudNameChip _selfName, _tName;
+    readonly List<HudNameChip> _teamRows = new();
     Team        _hookedTeam;
     AnimatedFlame[] _auraFlames;
     LocalPlayerManager _owner, _currentTarget;
@@ -36,11 +36,13 @@ public class PlayerStatBarUI
     // Scaled layout metrics (computed in Initialize from the viewport-cell size).
     float _pad, _barH, _gap, _flameH, _barW, _roleSize, _pieSize, _barX;
     float _flameStart, _flameTotalW;
+    float _labelH, _labelFont, _nameBottom; // name box height / font / bottom offset (above health bar)
 
     public void Initialize(CanvasLayer layer, PlayerEvents playerEvents, LocalPlayerManager owner)
     {
         _playerEvents = playerEvents;
         _owner        = owner;
+        _layer        = layer;
 
         // ── Size everything as a fraction of THIS player's viewport cell ─────────────
         // (a fixed fraction of the cell, so the HUD looks the same whether it's a full view or
@@ -52,6 +54,8 @@ public class PlayerStatBarUI
         _barH     = 0.045f * ch;
         _gap      = 0.012f * ch;
         _roleSize = 0.075f * ch;
+        _labelH    = _barH * 2f;                       // name box height (Unity: barH * 2)
+        _labelFont = _barH * 1.5f;                     // name font size  (Unity: barH * 1.5)
         float barEnd = 0.45f * cw;                    // bars' right edge = 45% across the cell
         _barX     = _pad;                             // bars' left edge lines up with the pie's left edge
         _barW     = Mathf.Max(10f, barEnd - _barX);
@@ -73,18 +77,17 @@ public class PlayerStatBarUI
 
         if (_owner?.personalSymbol?.sprite != null) _auraSymbol.Texture = _owner.personalSymbol.sprite;
 
-        // Own role chip (figure +crown-if-leader) at the pie's top-right corner.
-        float roleL = _pad + _pieSize - _roleSize, roleB = -(_pad + _pieSize - _gap);
-        _selfRole = new RoleBadge();
-        _selfRole.AnchorLeft = 0f; _selfRole.AnchorRight = 0f; _selfRole.AnchorTop = 1f; _selfRole.AnchorBottom = 1f;
-        _selfRole.OffsetLeft = roleL; _selfRole.OffsetRight = roleL + _roleSize;
-        _selfRole.OffsetBottom = roleB; _selfRole.OffsetTop = roleB - _roleSize;
-        layer.AddChild(_selfRole);
+        // ── Name box (Unity parity) ──────────────────────────────────────────────────
+        // A dark label above the health bar: [figure(+crown) | name], left-aligned. Teammate
+        // rows stack upward above it. The figure shows only while teamed; the crown only for a
+        // leader — exactly like Unity's name label / team list.
+        float healthTop = _pad + _pieSize + 2f * _barH; // top edge of the health bar
+        _nameBottom = healthTop + _gap;                 // name box bottom = just above the bar
 
-        // Team roster — a row of figure(+crown) chips, one per OTHER member, above the stack.
-        _rosterRow = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
-        _rosterRow.AnchorLeft = 0f; _rosterRow.AnchorRight = 0f; _rosterRow.AnchorTop = 1f; _rosterRow.AnchorBottom = 1f;
-        layer.AddChild(_rosterRow);
+        _selfName = new HudNameChip(_labelH, _labelFont, showIcon: true, new Color(1f, 1f, 1f), bold: true);
+        PlaceChip(_selfName, _nameBottom, rightSide: false);
+        layer.AddChild(_selfName);
+        _selfName.SetText(_owner?.playerName);
 
         playerEvents.OnTeamChanged += UpdateRole;
         UpdateRole();
@@ -97,6 +100,11 @@ public class PlayerStatBarUI
         _tAuraSymbol  = MakeSymbol(_tAuraPie);
         _tStaminaFill = MakeBar(_targetRoot, staminaBot, StaminaCol, rightSide: true);
         _tHealthFill  = MakeBar(_targetRoot, healthBot,  HealthCol,  rightSide: true);
+
+        // Target name box — right-aligned, no role icon (mirrors Unity's target name label).
+        _tName = new HudNameChip(_labelH, _labelFont, showIcon: false, new Color(1f, 1f, 1f), bold: true);
+        PlaceChip(_tName, _nameBottom, rightSide: true);
+        _targetRoot.AddChild(_tName);
 
         var health  = playerEvents.statEventsCoclection[StatEvents.Type.Health];
         var stamina = playerEvents.statEventsCoclection[StatEvents.Type.Stamina];
@@ -143,9 +151,10 @@ public class PlayerStatBarUI
 
     void UpdateRole()
     {
-        if (_selfRole == null || _owner?.teamController == null) return;
+        if (_selfName == null || _owner?.teamController == null) return;
 
-        _selfRole.SetRole(_owner.CurrentTeamStatus);
+        _selfName.SetText(_owner.playerName);
+        _selfName.SetRole(_owner.CurrentTeamStatus);
 
         // Re-hook membership so the roster refreshes when OTHER players join/leave this team
         // (status events only fire on the member whose status actually changed).
@@ -160,28 +169,48 @@ public class PlayerStatBarUI
         RebuildRoster(team);
     }
 
+    // One teammate name row per OTHER member, stacked upward above the local name box (Unity parity).
     void RebuildRoster(Team team)
     {
-        foreach (var b in _rosterBadges) b.QueueFree();
-        _rosterBadges.Clear();
+        foreach (var r in _teamRows) r.QueueFree();
+        _teamRows.Clear();
 
         if (team == null) return;
 
-        float rowBottom = _pad + _pieSize + 2f * _barH + _gap; // just above the health bar
-        int slot = 0;
+        int row = 1; // own name is row 0 (the _selfName box); teammates stack above it
         foreach (var member in team.GetAllMembers())
         {
-            if (member == _owner) continue; // self is shown by _selfRole
-            var badge = new RoleBadge();
-            float x = _pad + slot * (_roleSize + 4f);
-            badge.AnchorLeft = 0f; badge.AnchorRight = 0f; badge.AnchorTop = 1f; badge.AnchorBottom = 1f;
-            badge.OffsetLeft = x; badge.OffsetRight = x + _roleSize;
-            badge.OffsetBottom = -rowBottom; badge.OffsetTop = -(rowBottom + _roleSize);
-            _rosterRow.AddChild(badge);
-            badge.SetRole(member.CurrentTeamStatus);
-            _rosterBadges.Add(badge);
-            slot++;
+            if (member == _owner) continue;
+            var chip = new HudNameChip(_labelH, _labelFont, showIcon: true,
+                                       new Color(0.90f, 0.90f, 0.90f), bold: false);
+            PlaceChip(chip, _nameBottom + row * (_labelH + 1f), rightSide: false);
+            _layer.AddChild(chip);
+            chip.SetText(member.playerName);
+            chip.SetRole(member.CurrentTeamStatus);
+            _teamRows.Add(chip);
+            row++;
         }
+    }
+
+    // Position a content-sized name chip by its bottom edge, growing right (left side) or left
+    // (right side) and always upward.
+    void PlaceChip(HudNameChip chip, float bottomOffset, bool rightSide)
+    {
+        chip.AnchorTop = chip.AnchorBottom = 1f;
+        chip.GrowVertical = Control.GrowDirection.Begin; // grow upward
+        if (rightSide)
+        {
+            chip.AnchorLeft = chip.AnchorRight = 1f;
+            chip.GrowHorizontal = Control.GrowDirection.Begin; // grow left from the right edge
+            chip.OffsetRight = -_pad;
+        }
+        else
+        {
+            chip.AnchorLeft = chip.AnchorRight = 0f;
+            chip.GrowHorizontal = Control.GrowDirection.End;   // grow right from the left edge
+            chip.OffsetLeft = _pad;
+        }
+        chip.OffsetBottom = -bottomOffset;
     }
 
     // Light the aura-flame row from the current rolling 100-band: each flame = 10 aura,
@@ -328,6 +357,7 @@ public class PlayerStatBarUI
 
             if (_targetRoot != null) _targetRoot.Visible = true;
             if (_tAuraSymbol != null) _tAuraSymbol.Texture = target.ActiveSymbol?.sprite;
+            _tName?.SetText(target.playerName);
             target.statManager.BroadcastCurrentValues();
         }
         else if (_targetRoot != null)

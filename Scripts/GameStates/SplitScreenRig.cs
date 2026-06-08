@@ -35,7 +35,10 @@ public partial class SplitScreenRig : Node
             var container = new SubViewportContainer
             {
                 Stretch     = true,
-                MouseFilter = Control.MouseFilterEnum.Ignore,
+                // Stop (not Ignore) so mouse clicks forward into the SubViewport's GUI — this lets
+                // the teaming dialog choices be confirmed by clicking. Gamepad input is polled, so
+                // it is unaffected by this change.
+                MouseFilter = Control.MouseFilterEnum.Stop,
             };
             // Anchor to this player's grid cell (fractions of the window).
             container.AnchorLeft   = (float)col       / cols;
@@ -49,7 +52,10 @@ public partial class SplitScreenRig : Node
             {
                 World3D                = sharedWorld,
                 RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-                HandleInputLocally     = false, // input stays global/per-device
+                // true so SubViewportContainer-forwarded mouse events reach in-viewport GUI (the
+                // teaming dialog buttons). Gamepad/keyboard are polled, not event-driven, so this
+                // doesn't affect player input routing.
+                HandleInputLocally     = true,
                 Size                   = cellSize,
             };
             container.AddChild(vp);
